@@ -9,10 +9,19 @@ QT       += core gui
 TARGET = qpicview
 TEMPLATE = app
 
+DEFINES += _UNICODE UNICODE
 
 SOURCES += main.cpp\
-        mainwindow.cpp
+        mainwindow.cpp \
+    MemoryMappedFile.cpp \
+    IffIlbm.cpp \
+    IffContainer.cpp \
+    FileType.cpp
 
-HEADERS  += mainwindow.h
+HEADERS  += mainwindow.h \
+    MemoryMappedFile.h \
+    IffIlbm.h \
+    IffContainer.h \
+    FileType.h
 
 FORMS    += mainwindow.ui

@@ -2,16 +2,38 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QGraphicsScene>
-#include <QImage>
 #include <QKeyEvent>
 
 #include <QStringList>
+
+// prefer ISO-standard type names when available..
+#include <stdint.h>
+
+
+// changed: prefer fwd. decl. here..
+class QGraphicsScene;
+class QImage;
+class QFile;
 
 
 namespace Ui {
     class MainWindow;
 }
+
+// type of file data
+// according to header in file
+//
+typedef enum tFormatType
+{
+	FORMAT_UNKNOWN = 0,
+	
+	FORMAT_ILBM, // IFF-ILBM (Amiga)
+	
+	FORMAT_JPEG,
+	FORMAT_PNG,
+	FORMAT_GIF,
+	FORMAT_TIFF
+};
 
 class MainWindow : public QMainWindow
 {
@@ -28,8 +50,11 @@ protected:
 	void ResizeToCurrent();
 	void RescaleImage();
 	
+	bool CheckFormat(const QString &szFile, QString &szFormat);
+	
 private:
     Ui::MainWindow *ui;
+	QFile *m_pFile;
 	QGraphicsScene *m_pScene;
 	QImage *m_pCurImage;
 	//QString m_szCurImagePath;

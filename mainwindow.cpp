@@ -4,7 +4,11 @@
 #include <QGraphicsPixmapItem>
 #include <QTransform>
 #include <QMatrix>
+#include <QGraphicsScene>
+#include <QImage>
+#include <QImageReader>
 
+#include <QFile>
 #include <QScrollBar>
 #include <QLabel>
 #include <QTextEdit>
@@ -13,9 +17,17 @@
 #include <QFileDialog>
 #include <QDir>
 
+// prefer ISO-standard type names when available..
+#include <stdint.h>
+
+#include "FileType.h"
+#include "IffIlbm.h"
+
+
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
+	m_pFile(nullptr),
 	m_pScene(NULL),
 	m_pCurImage(NULL),
 	//m_szCurImagePath(),
@@ -65,6 +77,11 @@ MainWindow::~MainWindow()
 	if (m_pCurImage != NULL)
 	{
 		delete m_pCurImage;
+	}
+	if (m_pFile != nullptr)
+	{
+		m_pFile->close();
+		delete m_pFile;
 	}
     delete ui;
 }
@@ -201,8 +218,102 @@ void MainWindow::RescaleImage()
 	ui->graphicsView->scale(rScale, rScale);
 }
 
+// check that format of given file is supported
+// before loading,
+// also check if we need our own loading routines..
+//
+bool MainWindow::CheckFormat(const QString &szFile, QString &szFormat)
+{
+	// what can we load..
+	QList<QByteArray> lstFormats = QImageReader::supportedImageFormats();
+	
+	if (m_pFile != nullptr)
+	{
+		m_pFile->close();
+		delete m_pFile;
+	}
+
+	m_pFile = new QFile(szFile, this);
+	if (m_pFile == nullptr)
+	{
+		return false;
+	}
+	if (m_pFile->open(QIODevice::ReadOnly) == false)
+	{
+		delete m_pFile;
+		m_pFile = nullptr;
+		return false;
+	}
+
+	// map entire file into view
+	qint64 iSize = m_pFile->size();
+	uchar *pView = m_pFile->map(0, iSize);
+	if (pView == NULL
+		|| iSize == 0)
+	{
+		delete m_pFile;
+		m_pFile = nullptr;
+		return false;
+	}
+
+	//tFormatType enFileType = FORMAT_UNKNOWN;
+	
+	// get identifier at start
+	//uint32_t ulFirstFour = ((pView[3] << 24) + (pView[2] << 16) + (pView[1] << 8) + pView[0]);
+	
+	CFileType Type;
+	tHeaderType enFormat = Type.FileTypeFromHeader(pView, iSize);
+	
+	// check if format is supported by Qt
+	bool bLoaderExists = false;
+	switch (enFormat)
+	{
+	case HEADERTYPE_ILBM:
+		szFormat = "ilbm";
+		break;
+	case HEADERTYPE_JPEG:
+		szFormat = "jpeg";
+		break;
+	case HEADERTYPE_PNG:
+		szFormat = "png";
+		break;
+	case HEADERTYPE_GIF:
+		szFormat = "gif";
+		break;
+	case HEADERTYPE_TIFF:
+		szFormat = "tiff";
+		break;
+	}
+	
+	// if format handling supported -> let Qt do loading
+	//
+	bLoaderExists = lstFormats.contains(szFormat.toAscii());
+	if (bLoaderExists == true)
+	{
+		return true;
+	}
+
+	// no loader, see if we have our own..
+	if (bLoaderExists == false
+		&& enFormat == HEADERTYPE_ILBM)
+	{
+		// load&parse ILBM
+		CIffIlbm IffIlbm;
+		//IffIlbm.ParseFile();
+	}
+	
+	// not yet completed..
+	// close file
+	m_pFile->close();
+	delete m_pFile;
+	m_pFile = nullptr;
+	return false;
+}
+
 void MainWindow::FileChanged(QString szFile)
 {
+	setWindowTitle(m_szBaseTitle);
+	
 	// destroy old (if any)
 	if (m_pCurImage != NULL)
 	{
@@ -223,22 +334,39 @@ void MainWindow::FileChanged(QString szFile)
 		//ui->graphicsView->resetMatrix();
 	}
 
-	QString szTitle = m_szBaseTitle + " - Loading " + szFile;
-	setWindowTitle(szTitle);
+	bool bRet = false;
+	QString szFormat;
+	if (CheckFormat(szFile, szFormat) == false)
+	{
+		// load failure or not supported format?
+		return;
+	}
 
-    // load new selected and keep it
-	// (not truly necessary but may be useful later..)
-	//
+	// keep for later
     m_pCurImage = new QImage();
-    if (m_pCurImage->load(szFile) == false)
+	
+	// if format is supported by Qt -> use loader
+	// otherwise -> use our own loader
+	//
+	if (szFormat.length() > 0
+		&& m_pFile != nullptr)
+	{
+		bRet = m_pCurImage->load(m_pFile, szFormat.toAscii());
+	}
+	else
+	{
+		bRet = m_pCurImage->load(szFile);
+	}
+    if (bRet == false)
     {
 		// failed loading: cleanup
 		delete m_pCurImage;
 		m_pCurImage = NULL;
-		setWindowTitle(m_szBaseTitle);
 		return;
 	}
 
+	setWindowTitle(m_szBaseTitle + " - " + szFile);
+	
 	// pixmap from image and set to scene,
 	// resize scene to image
 	m_pScene->addPixmap(QPixmap::fromImage((*m_pCurImage)));
