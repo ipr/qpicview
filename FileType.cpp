@@ -1,3 +1,10 @@
+//////////////////////////////////
+//
+// CFileType : file type detection
+//
+// Ilkka Prusi, 2010
+//
+
 #include "FileType.h"
 
 /*
