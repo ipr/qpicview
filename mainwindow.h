@@ -49,6 +49,7 @@ protected:
 	
 	void ResizeToCurrent();
 	void RescaleImage();
+	void DoImageSize();
 	
 	bool CheckFormat(const QString &szFile, QString &szFormat);
 	
@@ -65,6 +66,9 @@ private:
 	
 	// if was maximized when entering fullscreen
 	bool m_bMaximized;
+	
+	// supported formats
+	QList<QByteArray> m_lstFormats;
 
 signals:
 	void FileSelection(QString);

@@ -204,18 +204,44 @@ void MainWindow::RescaleImage()
 	
 	// also repositioning at center of image in case large picture
 	ui->graphicsView->centerOn(imagesize.width()/2, imagesize.height()/2);
+	
+	// in case vertical scrollbar needs showing we need width of it..
+	QSize sbv = ui->graphicsView->verticalScrollBar()->sizeHint();
+	QSize sbh = ui->graphicsView->horizontalScrollBar()->sizeHint();
+	QSize sbt = ui->mainToolBar->sizeHint();
 
 	if (imagesize.width() > maxsize.width())
 	{
 		// TODO: better way to scale according to actual view-area (take framesize into account),
 		// also height and scroll bars..
-		rScale = (qreal)maxsize.width() / (qreal)imagesize.width();
+		rScale = (qreal)(maxsize.width() - sbv.width()) / (qreal)imagesize.width();
 	}
 	else if (imagesize.height() > maxsize.height())
 	{
-		rScale = (qreal)maxsize.height() / (qreal)imagesize.height();
+		rScale = (qreal)(maxsize.height() - (sbh.height()+sbt.height())) / (qreal)imagesize.height();
 	}
 	ui->graphicsView->scale(rScale, rScale);
+}
+
+// resize window and/or rescale image
+// when changing mode or image
+//
+void MainWindow::DoImageSize()
+{
+	if (isFullScreen() == true)
+	{
+		// fit to screen
+		RescaleImage();
+	}
+	else
+	{
+		// resize main window to fit current image:
+		// in case different size image was selected while in fullscreen mode
+		ResizeToCurrent();
+		
+		// reset image-view scaling on screen mode switch
+		ui->graphicsView->resetTransform();
+	}
 }
 
 // check that format of given file is supported
@@ -224,9 +250,12 @@ void MainWindow::RescaleImage()
 //
 bool MainWindow::CheckFormat(const QString &szFile, QString &szFormat)
 {
-	// what can we load..
-	QList<QByteArray> lstFormats = QImageReader::supportedImageFormats();
-	
+	if (m_lstFormats.empty())
+	{
+		// what can we load..
+		m_lstFormats = QImageReader::supportedImageFormats();
+	}
+		
 	if (m_pFile != nullptr)
 	{
 		m_pFile->close();
@@ -287,12 +316,13 @@ bool MainWindow::CheckFormat(const QString &szFile, QString &szFormat)
 	
 	// if format handling supported -> let Qt do loading
 	//
-	bLoaderExists = lstFormats.contains(szFormat.toAscii());
+	bLoaderExists = m_lstFormats.contains(szFormat.toAscii());
 	if (bLoaderExists == true)
 	{
 		return true;
 	}
 
+	/*
 	// no loader, see if we have our own..
 	if (bLoaderExists == false
 		&& enFormat == HEADERTYPE_ILBM)
@@ -301,12 +331,14 @@ bool MainWindow::CheckFormat(const QString &szFile, QString &szFormat)
 		CIffIlbm IffIlbm;
 		//IffIlbm.ParseFile();
 	}
+	*/
 	
 	// not yet completed..
 	// close file
 	m_pFile->close();
 	delete m_pFile;
 	m_pFile = nullptr;
+	
 	return false;
 }
 
@@ -334,6 +366,7 @@ void MainWindow::FileChanged(QString szFile)
 		//ui->graphicsView->resetMatrix();
 	}
 
+	/*
 	bool bRet = false;
 	QString szFormat;
 	if (CheckFormat(szFile, szFormat) == false)
@@ -341,6 +374,7 @@ void MainWindow::FileChanged(QString szFile)
 		// load failure or not supported format?
 		return;
 	}
+	*/
 
 	// keep for later
     m_pCurImage = new QImage();
@@ -348,6 +382,7 @@ void MainWindow::FileChanged(QString szFile)
 	// if format is supported by Qt -> use loader
 	// otherwise -> use our own loader
 	//
+	/*
 	if (szFormat.length() > 0
 		&& m_pFile != nullptr)
 	{
@@ -357,6 +392,8 @@ void MainWindow::FileChanged(QString szFile)
 	{
 		bRet = m_pCurImage->load(szFile);
 	}
+	*/
+	bool bRet = m_pCurImage->load(szFile);
     if (bRet == false)
     {
 		// failed loading: cleanup
@@ -373,7 +410,8 @@ void MainWindow::FileChanged(QString szFile)
 	m_pScene->setSceneRect(m_pCurImage->rect());
 
 	// resize main window to fit current image
-	ResizeToCurrent();
+	//ResizeToCurrent();
+	DoImageSize();
 }
 
 void MainWindow::PathFileRefresh(QString szFilePath)
@@ -456,12 +494,7 @@ void MainWindow::on_actionFullscreen_triggered(bool checked)
 		}
 	}
 
-	// resize main window to fit current image:
-	// in case different size image was selected while in fullscreen mode
-	ResizeToCurrent();
-	
-	// reset image-view scaling on screen mode switch
-	ui->graphicsView->resetTransform();
+	DoImageSize();
 }
 
 void MainWindow::on_actionZoom_in_triggered()
