@@ -53,16 +53,45 @@ void CIffIlbm::ParseBody(uint8_t *pData, CIffChunk *pChunk)
 	// and the BODY encodes pixels as literal RGB values.
 	//
 
-	int64_t ickEnd = (pChunk->m_iOffset + pChunk->m_iChunkSize);
+    
+    int64_t ickEnd = (pChunk->m_iOffset + pChunk->m_iChunkSize);
 	int64_t iChOffset = pChunk->m_iOffset;
+    
+    // note: all rows should be same size (and word-aligned?)
+    int iRowBytes = ((m_BmHeader.w + 15) >> 4) << 1;
+    int iBodySize = m_BmHeader.h*m_BmHeader.nPlanes*iRowBytes;
+    
+    UBYTE *pBody = new UBYTE[iBodySize];
+    if (m_BmHeader.compression == cmpNone)
+    {
+        // no compression -> copy as-is
+        ::memcpy(pBody, pData, iBodySize);
+        iChOffset += iBodySize;
+        
+        // TODO:?
+        // extra bitplane per "row" (see height)
+        if (m_BmHeader.masking != mskNone)
+        {
+            // read masking
+            /*
+            UBYTE *pLine = new UBYTE[iRowBytes];
+            ::memcpy(pLine, pData, iRowBytes);
+            iChOffset += iRowBytes;
+            */
+        }
+    }
+    else if (m_BmHeader.compression == cmpByteRun1)
+    {
+        // decompress scanline
+        DecompressByteRun1(pData, ickEnd, iChOffset, pBody);
+    }
+
+/*    
 	while (iChOffset < ickEnd)
 	{
 		// read each scanline for each plane
 		// also handle compression (if any)
 		// and masking-scanline (if any).
-
-		// WORDs or BYTEs ?
-		// WORDs (bytes??)
 
 		// note: all rows should be same size (and word-aligned?)
 		int iRowBytes = ((m_BmHeader.w + 15) >> 4) << 1;
@@ -77,7 +106,6 @@ void CIffIlbm::ParseBody(uint8_t *pData, CIffChunk *pChunk)
 			{
 				// read scanline:
 				// output-width should be known already (in header)
-
 
 				// actually, arrays of ColorRegister ?
 				// (depends if CMAP exists..)
@@ -109,6 +137,7 @@ void CIffIlbm::ParseBody(uint8_t *pData, CIffChunk *pChunk)
 			}
 		}
 	}
+*/
 
 }
 
